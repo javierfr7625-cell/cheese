@@ -95,6 +95,18 @@ export const matches = {
     },
 };
 
+export const chat = {
+    getHistory: async (userId, otherUserId) => {
+        try {
+            const response = await fetch(`${API_URL}/chat/${userId}/${otherUserId}`);
+            return await response.json();
+        } catch (error) {
+            console.error('Get chat history error:', error);
+            return [];
+        }
+    },
+};
+
 export const profile = {
     get: async (userId) => {
         try {

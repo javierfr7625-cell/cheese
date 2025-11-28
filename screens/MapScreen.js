@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, Dimensions, Text, Image, Platform, TouchableOpacity, Modal, Alert } from 'react-native';
-import MapView, { Marker, Callout } from 'react-native-maps';
+import MapView, { Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { location, matches } from '../services/api';
 
@@ -9,6 +9,7 @@ export default function MapScreen({ route, navigation }) {
     const [nearbyUsers, setNearbyUsers] = useState([]);
     const [errorMsg, setErrorMsg] = useState(null);
     const [filter, setFilter] = useState('all'); // all, male, female
+    const [selectedUser, setSelectedUser] = useState(null);
 
     // Get userId passed from Login/Register
     const userId = route.params?.userId;
@@ -37,12 +38,16 @@ export default function MapScreen({ route, navigation }) {
 
     const updateLocation = async (coords) => {
         if (!coords) return;
+        // console.log('Updating location:', coords); 
         await location.update(coords.latitude, coords.longitude, userId);
         const users = await location.getNearby(coords.latitude, coords.longitude, userId, filter);
+        // console.log('Nearby users:', users);
         setNearbyUsers(users);
     };
 
     const handleLike = async (likedUser) => {
+        if (!likedUser) return;
+
         const result = await matches.like(userId, likedUser.id);
         if (result.success) {
             if (result.match) {
@@ -50,6 +55,7 @@ export default function MapScreen({ route, navigation }) {
             } else {
                 Alert.alert('Liked!', `You liked ${likedUser.name}`);
             }
+            setSelectedUser(null); // Close card
         } else {
             Alert.alert('Error', result.message || 'Could not like user');
         }
@@ -74,7 +80,8 @@ export default function MapScreen({ route, navigation }) {
                     longitudeDelta: 0.01,
                 }}
                 showsUserLocation={true}
-                onUserLocationChange={(e) => updateLocation(e.nativeEvent.coordinate)}
+                // onUserLocationChange={(e) => updateLocation(e.nativeEvent.coordinate)} // Disabled to prevent infinite loop
+                onPress={() => setSelectedUser(null)}
             >
                 {nearbyUsers.map((user) => (
                     <Marker
@@ -82,6 +89,10 @@ export default function MapScreen({ route, navigation }) {
                         coordinate={{
                             latitude: user.latitude,
                             longitude: user.longitude,
+                        }}
+                        onPress={(e) => {
+                            e.stopPropagation();
+                            setSelectedUser(user);
                         }}
                     >
                         <View style={styles.markerContainer}>
@@ -91,12 +102,6 @@ export default function MapScreen({ route, navigation }) {
                                 style={styles.avatar}
                             />
                         </View>
-                        <Callout tooltip onPress={() => handleLike(user)}>
-                            <View style={styles.callout}>
-                                <Text style={styles.calloutTitle}>{user.name}</Text>
-                                <Text style={styles.calloutSubtitle}>Tap to LIKE ❤️</Text>
-                            </View>
-                        </Callout>
                     </Marker>
                 ))}
             </MapView>
@@ -131,6 +136,32 @@ export default function MapScreen({ route, navigation }) {
                     <Text style={styles.actionButtonText}>👤</Text>
                 </TouchableOpacity>
             </View>
+
+            {/* User Card (Bottom Sheet) */}
+            {selectedUser && (
+                <View style={styles.userCard}>
+                    <View style={styles.cardHeader}>
+                        <Image
+                            source={{ uri: selectedUser.photo_url || 'https://ui-avatars.com/api/?name=' + selectedUser.name }}
+                            style={styles.cardAvatar}
+                        />
+                        <View style={styles.cardInfo}>
+                            <Text style={styles.cardName}>{selectedUser.name}</Text>
+                            <Text style={styles.cardBio}>{selectedUser.gender}</Text>
+                        </View>
+                        <TouchableOpacity onPress={() => setSelectedUser(null)} style={styles.closeButton}>
+                            <Text style={styles.closeButtonText}>✕</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <TouchableOpacity
+                        style={styles.likeButton}
+                        onPress={() => handleLike(selectedUser)}
+                    >
+                        <Text style={styles.likeButtonText}>LIKE ❤️</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
         </View>
     );
 }
@@ -197,6 +228,8 @@ const styles = StyleSheet.create({
     markerContainer: {
         alignItems: 'center',
         justifyContent: 'center',
+        width: 44,
+        height: 44,
     },
     markerBubble: {
         width: 44,
@@ -210,6 +243,7 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 20,
+        backgroundColor: '#ddd', // Fallback color
     },
     female: {
         backgroundColor: '#FF416C',
@@ -217,21 +251,63 @@ const styles = StyleSheet.create({
     male: {
         backgroundColor: '#007AFF',
     },
-    callout: {
+    // User Card Styles
+    userCard: {
+        position: 'absolute',
+        bottom: 30,
+        left: 20,
+        right: 20,
         backgroundColor: '#fff',
-        padding: 10,
-        borderRadius: 8,
-        width: 140,
+        borderRadius: 20,
+        padding: 20,
+        elevation: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 5 },
+        shadowOpacity: 0.3,
+        shadowRadius: 5,
+    },
+    cardHeader: {
+        flexDirection: 'row',
         alignItems: 'center',
-        elevation: 5,
+        marginBottom: 20,
     },
-    calloutTitle: {
+    cardAvatar: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        marginRight: 15,
+    },
+    cardInfo: {
+        flex: 1,
+    },
+    cardName: {
+        fontSize: 20,
         fontWeight: 'bold',
+        color: '#333',
+    },
+    cardBio: {
+        fontSize: 14,
+        color: '#666',
+        marginTop: 2,
+        textTransform: 'capitalize',
+    },
+    closeButton: {
+        padding: 5,
+    },
+    closeButtonText: {
+        fontSize: 20,
+        color: '#999',
+    },
+    likeButton: {
+        backgroundColor: '#FF416C',
+        paddingVertical: 15,
+        borderRadius: 15,
+        alignItems: 'center',
+    },
+    likeButtonText: {
+        color: '#fff',
         fontSize: 16,
-        marginBottom: 4,
-    },
-    calloutSubtitle: {
-        color: '#FF416C',
         fontWeight: 'bold',
-    }
+        letterSpacing: 1,
+    },
 });

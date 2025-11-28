@@ -34,7 +34,10 @@ export default function MatchesScreen({ route, navigation }) {
                 <Text style={styles.name}>{item.name}</Text>
                 <Text style={styles.status}>Matched!</Text>
             </View>
-            <TouchableOpacity style={styles.chatButton}>
+            <TouchableOpacity
+                style={styles.chatButton}
+                onPress={() => navigation.navigate('Chat', { userId, otherUser: item })}
+            >
                 <Text style={styles.chatButtonText}>Chat</Text>
             </TouchableOpacity>
         </View>
